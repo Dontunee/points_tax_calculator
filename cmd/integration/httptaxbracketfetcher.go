@@ -25,26 +25,26 @@ func (h *HTTPTaxBracketFetcher) FetchTaxBrackets(year int) (*model.IncomeTaxCalc
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("error making request: %v", err)
+		return nil, fmt.Errorf("http tax bracket fetcher failed to make request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("tax bracket fetcher failed with non-OK status code: %d, message: %s", resp.StatusCode, resp.Status)
+		return nil, fmt.Errorf("http tax bracket fetcher failed with non-OK status code: %d, message: %s", resp.StatusCode, resp.Status)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
+		return nil, fmt.Errorf("http tax bracket fetcher failed to read response body: %v", err)
 	}
 
 	var taxResponse model.IncomeTaxCalculatorResponse
 	if err := json.Unmarshal(body, &taxResponse); err != nil {
-		return nil, fmt.Errorf("error parsing JSON response: %v", err)
+		return nil, fmt.Errorf("http tax bracket fetcher failed to parse JSON response: %v", err)
 	}
 
 	if len(taxResponse.TaxBrackets) == 0 {
-		return nil, fmt.Errorf("tax data has no brackets defined")
+		return nil, fmt.Errorf("http tax bracket fetcher failed with with no data for tax brackets")
 	}
 
 	return &taxResponse, nil

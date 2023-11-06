@@ -29,7 +29,7 @@ func startServer() {
 
 	flag.IntVar(&cfg.port, "port", 8000, "server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
-	flag.StringVar(&cfg.taxCalculatorUrl, "taxCalculatorUrl", "http://localhost:5000/tax-calculator", "")
+	flag.StringVar(&cfg.taxCalculatorUrl, "taxCalculatorUrl", "http://localhost:5000/tax-calculator", "taxCalculatorUrl")
 	flag.Parse()
 
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
