@@ -1,56 +1,16 @@
 package data
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
+	"github.com/Dontunee/points_tax_calculator/cmd/model"
 	"math"
-	"net/http"
 )
 
-type TaxBracketFetcher interface {
-	fetchTaxBrackets(year int) (*IncomeTaxCalculatorResponse, error)
-}
-
-type HTTPTaxBracketFetcher struct {
-	providerURL string
-}
-
 type IncomeTaxCalculator struct {
-	fetcher TaxBracketFetcher
+	fetcher model.TaxBracketFetcher
 }
 
-type TaxBracket struct {
-	Max  float64 `json:"max,omitempty"` // Omitempty allows Max to be omitted for the highest bracket
-	Min  float64 `json:"min"`
-	Rate float64 `json:"rate"`
-}
-
-type IncomeTaxCalculatorResponse struct {
-	TaxBrackets []TaxBracket `json:"tax_brackets"`
-}
-
-type IncomeTaxCalculation struct {
-	TotalTax      float64                    `json:"totalTax"`
-	TaxesPerBand  []IncomeTaxBandCalculation `json:"taxesPerBand"`
-	EffectiveRate float64                    `json:"effectiveRate"`
-}
-
-type IncomeTaxBandCalculation struct {
-	Band      string  `json:"band"`
-	TaxedAt   float64 `json:"taxedAt"`
-	TaxAmount float64 `json:"taxAmount"`
-}
-
-func NewHTTPTaxBracketFetcher(providerURL string) (*HTTPTaxBracketFetcher, error) {
-	if providerURL == "" {
-		return nil, fmt.Errorf("providerURL is not provided")
-	}
-
-	return &HTTPTaxBracketFetcher{providerURL: providerURL}, nil
-}
-
-func NewIncomeTaxCalculator(fetcher TaxBracketFetcher) (*IncomeTaxCalculator, error) {
+func NewIncomeTaxCalculator(fetcher model.TaxBracketFetcher) (*IncomeTaxCalculator, error) {
 	if fetcher == nil {
 		return nil, fmt.Errorf("fetcher is not provided")
 	}
@@ -58,10 +18,10 @@ func NewIncomeTaxCalculator(fetcher TaxBracketFetcher) (*IncomeTaxCalculator, er
 	return &IncomeTaxCalculator{fetcher: fetcher}, nil
 }
 
-func (tc *IncomeTaxCalculator) CalculateIncomeTax(income float64, year int) (IncomeTaxCalculation, error) {
-	var response IncomeTaxCalculation
+func (tc *IncomeTaxCalculator) CalculateIncomeTax(income float64, year int) (model.IncomeTaxCalculation, error) {
+	var response model.IncomeTaxCalculation
 
-	taxData, err := tc.fetcher.fetchTaxBrackets(year)
+	taxData, err := tc.fetcher.FetchTaxBrackets(year)
 	if err != nil {
 		return response, err
 	}
@@ -79,7 +39,7 @@ func (tc *IncomeTaxCalculator) CalculateIncomeTax(income float64, year int) (Inc
 	}
 
 	var totalTax float64
-	var taxesPerBand []IncomeTaxBandCalculation
+	var taxesPerBand []model.IncomeTaxBandCalculation
 
 	for i, bracket := range taxData.TaxBrackets {
 		if bracket.Min < 0 || bracket.Rate < 0 || (bracket.Max < bracket.Min && bracket.Max != 0) {
@@ -103,7 +63,7 @@ func (tc *IncomeTaxCalculator) CalculateIncomeTax(income float64, year int) (Inc
 			totalTax += tc.roundToTwoDecimalPlaces(taxAmount)
 
 			bandLabel := fmt.Sprintf("%.2f to %.2f", bracket.Min, bracket.Max)
-			taxesPerBand = append(taxesPerBand, IncomeTaxBandCalculation{
+			taxesPerBand = append(taxesPerBand, model.IncomeTaxBandCalculation{
 				Band:      bandLabel,
 				TaxedAt:   tc.roundToTwoDecimalPlaces(bracket.Rate * 100), // Converting to percentage
 				TaxAmount: taxAmount,
@@ -120,10 +80,9 @@ func (tc *IncomeTaxCalculator) CalculateIncomeTax(income float64, year int) (Inc
 		effectiveRate = totalTax / income * 100 // Converting to percentage
 	}
 
-	// Round totalTax before assigning it to response
 	totalTax = tc.roundToTwoDecimalPlaces(totalTax)
 
-	response = IncomeTaxCalculation{
+	response = model.IncomeTaxCalculation{
 		TotalTax:      totalTax,
 		TaxesPerBand:  taxesPerBand,
 		EffectiveRate: tc.roundToTwoDecimalPlaces(effectiveRate),
@@ -134,34 +93,4 @@ func (tc *IncomeTaxCalculator) CalculateIncomeTax(income float64, year int) (Inc
 
 func (tc *IncomeTaxCalculator) roundToTwoDecimalPlaces(number float64) float64 {
 	return math.Round(number*100) / 100
-}
-
-func (h *HTTPTaxBracketFetcher) fetchTaxBrackets(year int) (*IncomeTaxCalculatorResponse, error) {
-	url := fmt.Sprintf("%s/tax-year/%d", h.providerURL, year)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("tax bracket fetcher failed with non-OK status code: %d, message: %s", resp.StatusCode, resp.Status)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
-	}
-
-	var taxResponse IncomeTaxCalculatorResponse
-	if err := json.Unmarshal(body, &taxResponse); err != nil {
-		return nil, fmt.Errorf("error parsing JSON response: %v", err)
-	}
-
-	if len(taxResponse.TaxBrackets) == 0 {
-		return nil, fmt.Errorf("tax data has no brackets defined")
-	}
-
-	return &taxResponse, nil
 }

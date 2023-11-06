@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/Dontunee/points_tax_calculator/cmd/integration"
 	"github.com/Dontunee/points_tax_calculator/cmd/internal/data"
+	"github.com/Dontunee/points_tax_calculator/cmd/model"
 	"github.com/julienschmidt/httprouter"
 	"net/http"
 	"strconv"
@@ -48,7 +50,7 @@ func (app *application) calculateIncomeTaxHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	httpTaxBracketFetcher, err := data.NewHTTPTaxBracketFetcher(app.config.taxCalculatorUrl)
+	httpTaxBracketFetcher, err := integration.NewHTTPTaxBracketFetcher(app.config.taxCalculatorUrl)
 	if err != nil {
 		app.errorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -70,7 +72,7 @@ func (app *application) calculateIncomeTaxHandler(w http.ResponseWriter, r *http
 	return
 }
 
-func copyTaxCalculation(src data.IncomeTaxCalculation) IncomeTaxCalculationResponse {
+func copyTaxCalculation(src model.IncomeTaxCalculation) IncomeTaxCalculationResponse {
 	var dst IncomeTaxCalculationResponse
 
 	dst.TotalTax = src.TotalTax
